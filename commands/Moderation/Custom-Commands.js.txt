@@ -1,0 +1,141 @@
+const { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const CustomCommand = require('../../models/CustomCommand');
+
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('custom-command')
+        .setDescription('Manage custom commands')
+        .addSubcommand(subcommand => 
+            subcommand.setName('add')
+            .setDescription('Add a custom command')
+            .addStringOption(option => 
+                option.setName('name').setDescription('Command name').setRequired(true))
+            .addStringOption(option => 
+                option.setName('response').setDescription('Command response').setRequired(true))
+        )
+        .addSubcommand(subcommand => 
+            subcommand.setName('remove')
+            .setDescription('Remove a custom command')
+            .addStringOption(option => 
+                option.setName('name').setDescription('Command name').setRequired(true))
+        )
+        .addSubcommand(subcommand => 
+            subcommand.setName('show')
+            .setDescription('Show all custom commands')
+        )
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+        .setDMPermission(false),
+
+    async execute(interaction) {
+        await interaction.deferReply({ ephemeral: true });
+        const subcommand = interaction.options.getSubcommand();
+        const { user, guildId } = interaction;
+        
+        if (subcommand === 'add') {
+            const commandName = interaction.options.getString('name').toLowerCase();
+            const response = interaction.options.getString('response');
+
+
+            const existingCommand = await CustomCommand.findOne({ guildId, commandName });
+            if (existingCommand) {
+                const embed = new EmbedBuilder()
+                    .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                    .setTitle("Error")
+                    .setDescription(`Command \`${commandName}\` already exists on this server!`)
+                    .setColor(0x00c8ff)
+
+                    
+
+                return interaction.editReply({ embeds: [embed], ephemeral: true });
+            }
+
+            try {
+                await new CustomCommand({
+                    guildId,
+                    commandName,
+                    response,
+                    createdBy: user.id
+                }).save();
+
+                const successEmbed = new EmbedBuilder()
+                    .setAuthor({ name: interaction.client.user.username, iconURL: interaction.client.user.avatarURL() }) 
+                    .setTitle("Successfully") 
+                    .setDescription(`Custom command \`${commandName}\` has been added.`)
+                    .setColor(0x00c8ff)
+
+                    
+
+                return interaction.editReply({ embeds: [successEmbed], ephemeral: true });
+
+            } catch (error) {
+                console.error(error);
+                const errorEmbed = new EmbedBuilder()
+                    .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                    .setDescription(`Error adding custom command: ${error.message}`)
+                    .setColor(0x00c8ff)
+
+    
+                    
+              
+                return interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            }
+        } else if (subcommand === 'remove') {
+            const commandName = interaction.options.getString('name').toLowerCase();
+            const deletedCommand = await CustomCommand.findOneAndDelete({ guildId, commandName });
+
+            if (!deletedCommand) {
+                const embed = new EmbedBuilder()
+                    .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                    .setDescription('Command not found.')
+                    .setColor(0x00c8ff)
+
+                return interaction.editReply({ embeds: [embed], ephemeral: true });
+            }
+
+            const member = await interaction.guild.members.fetch(deletedCommand.createdBy);
+            const successEmbed = new EmbedBuilder()
+                .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                .setDescription(`Custom command \`${commandName}\` removed.`)
+                .setColor(0x00c8ff)
+
+          return interaction.editReply({ embeds: [successEmbed], ephemeral: true });
+
+        } else if (subcommand === 'show') {
+            const commands = await CustomCommand.find({ guildId });
+
+            if (!commands.length) {
+                const embed = new EmbedBuilder()
+                    .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                    .setDescription('No custom commands found.')
+                    .setColor(0x00c8ff);
+
+                return interaction.editReply({ embeds: [embed], ephemeral: true });
+            }
+
+            const commandDescriptions = await Promise.all(commands.map(async cmd => {
+                const member = await interaction.guild.members.fetch(cmd.createdBy);
+                return `\`p!${cmd.commandName}\` - Created by ${member.user.username}`;
+            }));
+
+            const embed = new EmbedBuilder()
+                .setAuthor({ 
+  name: interaction.client.user.username, 
+  iconURL: interaction.client.user.displayAvatarURL({ dynamic: true }) 
+})                .setTitle('Custom Commands')
+                .setDescription(commandDescriptions.join('\n'))
+                .setColor(0x00c8ff);
+
+            return interaction.editReply({ embeds: [embed], ephemeral: true });
+        }
+    }
+};
