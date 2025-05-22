@@ -35,7 +35,7 @@
 
 ## ❓ Need Help?
 
-- Join our [Support Server](https://discord.gg/nvz8SrnRbf)
+- Join our [Support Server](https://discord.gg/skWPJtaaQY)
 - Or send an email to [andre@enhanced-loop.net](mailto:andre@enhanced-loop.net)
 
 ---
